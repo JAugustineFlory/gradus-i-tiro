@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "charliermarsh.ruff",
+    "tamasfe.even-better-toml",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "vitest.explorer",
+    "ryanluker.vscode-coverage-gutters",
+    "qwtel.sqlite-viewer",
+    "yoavbls.pretty-ts-errors"
+  ]
+}
