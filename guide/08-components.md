@@ -1,8 +1,21 @@
-# 07 — Components with TDD
+# 08 — Components with TDD
+
+> **Where this fits.** This lesson delivers the user stories on screen:
+>
+> | Story | What you'll build |
+> | --- | --- |
+> | **US-1** record an application | `ApplicationForm` |
+> | **US-2** see all applications | `ApplicationList` |
+> | **US-3** update its status | a status picker in each list row |
+> | **US-4** delete a mistake | a Delete button in each list row |
+> | **US-5** still there tomorrow | `App`, loading from the backend |
+>
+> In the lesson 00 diagram, you're filling in the left-hand box and
+> drawing the arrow from it to FastAPI. Along the way you'll hit a real
+> **CORS** error and fix it test-first on the backend.
 
 **Goal:** two tested React components (a list and a form), a small API
-module, and an `App` that wires everything to the backend. Along the
-way you'll hit a real **CORS** error and fix it test-first.
+module, and an `App` that wires everything to the backend.
 
 Work in `frontend/` unless a step says otherwise.
 
@@ -12,7 +25,7 @@ Work in `frontend/` unless a step says otherwise.
 
 ---
 
-## The concepts first
+## Concepts first
 
 ### Components and props
 
@@ -29,7 +42,7 @@ props. A component should never change its own props.
 
 ### State
 
-**State** is data a component remembers between renders, and changing it
+**State** is data a component remembers between renders; changing it
 makes React re-draw the component.
 
 ```tsx
@@ -45,9 +58,9 @@ setter with a **new** value.
 
 ### Effects
 
-**`useEffect`** runs code *after* the component appears on screen —
-for things outside React, like fetching data. The `[]` at the end means
-"only once, when the component first appears."
+**`useEffect`** runs code *after* the component appears on screen — for
+things outside React, like fetching data from the backend. The `[]` at
+the end means "only once, when the component first appears."
 
 ### Passing functions down ("lifting state up")
 
@@ -55,7 +68,8 @@ The list and the form don't talk to the backend themselves. They receive
 **callback props** like `onDelete` and call them. The parent (`App`)
 decides what actually happens. That keeps the components simple — and
 easy to test, because a test can pass in a fake callback and check it
-was called.
+was called. (It's the same idea as dependency injection on the backend:
+the component *declares* what it needs; someone else provides it.)
 
 ### Testing like a user
 
@@ -88,11 +102,11 @@ expect(onDelete).toHaveBeenCalledWith(2)
 ## Step 1 — Shared types
 
 **Connect the dots.** The backend's `ApplicationRead` schema (in
-`backend/app/schemas.py`) defines what an application looks like in
-JSON. The frontend needs the same shape as a TypeScript **type**, so the
-editor can catch typos like `app.compnay`.
+`backend/app/schemas.py`, lines 20–27) defines what an application looks
+like in JSON. The frontend needs the same shape as a TypeScript
+**type**, so the editor can catch typos like `app.compnay`.
 
-Create `frontend/src/types.ts`:
+📄 **File:** `frontend/src/types.ts` — **new**:
 
 ```ts
 export const STATUSES = ['applied', 'interviewing', 'offer', 'rejected']
@@ -108,29 +122,37 @@ export type Application = {
 export type NewApplication = Omit<Application, 'id'>
 ```
 
-- **`type Application = {...}`** describes an object's shape. It exists
-  only while writing code; it disappears when the code runs.
-- **`applied_on: string`** — dates arrive from JSON as text
+- **Line 1** — the four statuses, in the order the UI should offer them.
+- **Lines 3–9** — **`type Application = {...}`** describes an object's
+  shape. It exists only while writing code; it disappears when the code
+  runs.
+- **Line 8, `applied_on: string`** — dates arrive from JSON as text
   (`'2026-10-01'`).
-- **`Omit<Application, 'id'>`** is a **utility type**: "`Application`
-  without `id`." That's exactly what the form sends — the backend
-  assigns the `id`.
+- **Line 11, `Omit<Application, 'id'>`** is a **utility type**:
+  "`Application` without `id`." That's exactly what the form sends — the
+  backend assigns the `id` (just like `ApplicationCreate` on the
+  backend).
 
 ---
 
-## Step 2 — `ApplicationList`, cycle by cycle
+## Step 2 — `ApplicationList`, cycle by cycle (US-2, US-3, US-4)
 
-Start watch mode and leave it running for this whole step:
+Start watch mode (in `frontend/`) and leave it running for this whole
+step:
 
 ```bash
 npm test
 ```
 
-### Cycle 1 — the empty state
+### Cycle 1 — the empty state (US-2)
+
+> **Story:** *see all my applications.* With none yet, the screen
+> should say so — and say what to do next.
 
 #### 🔴 Red
 
-Create `frontend/src/components/ApplicationList.test.tsx`:
+📄 **File:** `frontend/src/components/ApplicationList.test.tsx` —
+**new** (create the `components/` folder too):
 
 ```tsx
 import { render, screen } from '@testing-library/react'
@@ -179,17 +201,20 @@ describe('ApplicationList', () => {
 - **Line 4, `import type`:** this project's TypeScript settings
   require type-only imports to say `type`. It tells the build tool
   "this import disappears at runtime."
-- **Lines 7–21** are **test data**, shared by several tests.
+- **Lines 7–21** are **test data**, shared by several tests (the
+  frontend's `SAMPLE`).
 - **Line 23:** tests that don't care about a callback pass one that
   does nothing.
 - **`render(...)`** draws the component into jsdom. **`screen`** is
   how you search what was drawn.
+- `userEvent` and `vi` (lines 2–3) aren't used yet; later cycles need
+  them.
 
 🔴 **Expected:** `Failed to resolve import "./ApplicationList"`.
 
 #### 🟢 Green
 
-Create `frontend/src/components/ApplicationList.tsx`:
+📄 **File:** `frontend/src/components/ApplicationList.tsx` — **new**:
 
 ```tsx
 import type { Application } from '../types'
@@ -213,8 +238,8 @@ export function ApplicationList({ applications }: Props) {
 - **Line 9, `{ applications }`:** **destructuring** — pull the
   `applications` prop out by name. We'll add the others when a test
   needs them.
-- **`return null`** means "render nothing." It's the smallest thing that
-  passes.
+- **Line 13, `return null`** means "render nothing." It's the smallest
+  thing that passes.
 
 🟢 **Expected:** the test passes.
 
@@ -222,11 +247,13 @@ export function ApplicationList({ applications }: Props) {
 > alone leaves the user stuck. Telling them what to do next turns an
 > empty screen into an invitation.
 
-### Cycle 2 — show each application
+### Cycle 2 — show each application (US-2)
 
 #### 🔴 Red
 
-Add inside the `describe` block, after the first test:
+📄 **File:** `frontend/src/components/ApplicationList.test.tsx` —
+**edit**: add this test **inside the `describe` block**, after the first
+test (before the final `})`):
 
 ```tsx
   it('shows each application', () => {
@@ -252,7 +279,8 @@ Add inside the `describe` block, after the first test:
 
 #### 🟢 Green
 
-Replace `return null` (line 13 of `ApplicationList.tsx`) with:
+📄 **File:** `frontend/src/components/ApplicationList.tsx` — **edit**:
+replace **line 13** (`return null`) with:
 
 ```tsx
   return (
@@ -269,7 +297,8 @@ Replace `return null` (line 13 of `ApplicationList.tsx`) with:
 
 - **`{ ... }`** inside JSX means "run this JavaScript and show the
   result."
-- **`.map(...)`** turns each application into an `<li>`.
+- **`.map(...)`** turns each application into an `<li>` — like a Python
+  list comprehension.
 - **`key={application.id}`** — React needs a unique, stable `key` on
   each item in a list to track which one is which when the list changes.
   Use the database `id`, never the array position.
@@ -278,9 +307,15 @@ Replace `return null` (line 13 of `ApplicationList.tsx`) with:
 
 🟢 **Expected:** `2 passed` for this file.
 
-### Cycle 3 — delete
+### Cycle 3 — delete (US-4)
+
+> **Story:** *delete an application I logged by mistake.* Each row
+> needs a Delete button that tells the parent *which* application.
 
 #### 🔴 Red
+
+📄 **File:** `frontend/src/components/ApplicationList.test.tsx` —
+**edit**: add inside the `describe` block, after the last test:
 
 ```tsx
   it('calls onDelete with the id', async () => {
@@ -304,8 +339,8 @@ Replace `return null` (line 13 of `ApplicationList.tsx`) with:
 
 - **`async` / `await`:** user-event actions take a moment (like a real
   user), so they return a **Promise** — a value that arrives later.
-  `await` waits for it. A function that uses `await` must be marked
-  `async`.
+  `await` waits for it. It's the same idea as Python's `await`, and the
+  same rule: a function that uses `await` must be marked `async`.
 - **`userEvent.setup()`** creates a simulated user. Call it at the start
   of each test.
 - **`{ name: 'Delete Globex' }`** — there are *two* Delete buttons; the
@@ -316,15 +351,16 @@ Replace `return null` (line 13 of `ApplicationList.tsx`) with:
 
 #### 🟢 Green
 
-Two changes in `ApplicationList.tsx`:
+📄 **File:** `frontend/src/components/ApplicationList.tsx` — **edit**,
+two changes:
 
-1. Line 9: destructure `onDelete` too:
+**1.** **Line 9** — destructure `onDelete` too:
 
 ```tsx
 export function ApplicationList({ applications, onDelete }: Props) {
 ```
 
-2. Add a button inside the `<li>`, after the `<span>`:
+**2.** Inside the `<li>`, **after** the `<span>` line, add:
 
 ```tsx
           <button
@@ -348,9 +384,15 @@ export function ApplicationList({ applications, onDelete }: Props) {
 
 🟢 **Expected:** `3 passed`.
 
-### Cycle 4 — change status
+### Cycle 4 — change status (US-3)
+
+> **Story:** *update an application's status as it moves along.* Each
+> row needs a status picker that reports the new choice.
 
 #### 🔴 Red
+
+📄 **File:** `frontend/src/components/ApplicationList.test.tsx` —
+**edit**: add inside the `describe` block, after the last test:
 
 ```tsx
   it('calls onStatusChange with the id and new status', async () => {
@@ -380,7 +422,11 @@ export function ApplicationList({ applications, onDelete }: Props) {
 
 #### 🟢 Green
 
-1. Change the imports at the top of `ApplicationList.tsx` (line 1) to:
+📄 **File:** `frontend/src/components/ApplicationList.tsx` — **edit**,
+three changes:
+
+**1.** Replace **line 1** (the single `import type` line) with these
+three lines:
 
 ```tsx
 import { STATUSES } from '../types'
@@ -388,10 +434,12 @@ import type { Application } from '../types'
 import { formatStatus } from '../utils/formatStatus'
 ```
 
-   (`STATUSES` is a real value, so it uses a normal `import`;
-   `Application` is a type, so it keeps `import type`.)
+(`STATUSES` is a real value, so it uses a normal `import`;
+`Application` is a type, so it keeps `import type`. `formatStatus` is
+your function from lesson 07.)
 
-2. Destructure `onStatusChange`:
+**2.** Replace the function's first line with a destructuring of all
+three props:
 
 ```tsx
 export function ApplicationList({
@@ -401,8 +449,8 @@ export function ApplicationList({
 }: Props) {
 ```
 
-3. Add a `<select>` inside the `<li>`, between the `<span>` and the
-   `<button>`:
+**3.** Inside the `<li>`, **between** the `<span>` and the `<button>`,
+add:
 
 ```tsx
           <select
@@ -423,13 +471,12 @@ export function ApplicationList({
 - **`value={application.status}`** makes this a **controlled** input:
   React decides what's selected, based on the data.
 - **`event.target.value`** is the value of the option the user picked.
-- **`formatStatus`** — your function from lesson 06 — turns `offer` into
-  `Offer` for display, while the `value` stays lowercase for the
-  backend.
+- **`formatStatus`** turns `offer` into `Offer` for display, while the
+  `value` stays lowercase for the backend.
 
 🟢 **Expected:** `4 passed`.
 
-### Your finished `ApplicationList.tsx`
+### Your finished `frontend/src/components/ApplicationList.tsx`
 
 ```tsx
 import { STATUSES } from '../types'
@@ -483,8 +530,8 @@ export function ApplicationList({
 }
 ```
 
-Commit (from the repo root, in a second terminal, or stop watch mode
-with `q` first):
+Commit (stop watch mode with `q` first, or use a second terminal), from
+the repo root:
 
 ```bash
 git add .
@@ -493,9 +540,13 @@ git commit -m "feat(frontend): add ApplicationList"
 
 ---
 
-## Step 3 — `ApplicationForm`, cycle by cycle
+## Step 3 — `ApplicationForm`, cycle by cycle (US-1)
 
 ### Cycle 1 — submit what was typed
+
+> **Story:** *record each application I send.* The form collects
+> company, role, and date, and hands a complete `NewApplication` to its
+> parent.
 
 #### 🔴 Red
 
@@ -503,11 +554,13 @@ git commit -m "feat(frontend): add ApplicationList"
 
 - The form needs three fields: **Company**, **Role**, **Date applied**.
   Status always starts as `applied`, so it doesn't need a field.
-- When submitted, it should call `onSubmit` with a `NewApplication`.
+- When submitted, it should call `onSubmit` with a `NewApplication`
+  (from `frontend/src/types.ts`, line 11).
 - The test should type into each field *by its label*, then click the
-  button.
+  button — exactly what a user does.
 
-Create `frontend/src/components/ApplicationForm.test.tsx`:
+📄 **File:** `frontend/src/components/ApplicationForm.test.tsx` —
+**new**:
 
 ```tsx
 import { render, screen } from '@testing-library/react'
@@ -548,7 +601,7 @@ describe('ApplicationForm', () => {
 
 #### 🟢 Green
 
-Create `frontend/src/components/ApplicationForm.tsx`:
+📄 **File:** `frontend/src/components/ApplicationForm.tsx` — **new**:
 
 ```tsx
 import { useState } from 'react'
@@ -611,6 +664,7 @@ export function ApplicationForm({ onSubmit }: Props) {
 }
 ```
 
+- **Lines 9–14, `EMPTY_FORM`** — the form's starting values.
 - **Line 17, `useState<NewApplication>(EMPTY_FORM)`:** the form's
   state is one object holding every field. `<NewApplication>` tells
   TypeScript its shape.
@@ -619,9 +673,11 @@ export function ApplicationForm({ onSubmit }: Props) {
   Pass `'compnay'` and TypeScript flags it.
 - **Line 20, `{ ...form, [field]: value }`:** **spread** copies every
   field from the old state into a *new* object, then overwrites the one
-  that changed. `[field]` uses the variable's value as the key.
+  that changed. `[field]` uses the variable's value as the key. (Like
+  `{**form, field: value}` in Python.)
 - **Line 24, `event.preventDefault()`:** by default, submitting a form
   reloads the whole page. This stops that; React handles it instead.
+- **Line 25** hands the completed object to the parent.
 - **Wrapping each `<input>` in its `<label>`** links them, so clicking
   the label focuses the field, screen readers announce it, and
   `getByLabelText` finds it.
@@ -633,16 +689,24 @@ export function ApplicationForm({ onSubmit }: Props) {
 
 ### Cycle 2 — clear after submit
 
-#### 🔴 Red
+> **Story, continued:** after recording one application, the form should
+> be ready for the next.
 
-**🔵 First, refactor the test file.** The next test needs the same
-typing and clicking. Rather than copy nine lines, pull them into a
-helper. Add this **above** the `describe` block, and add the extra
-import:
+#### 🔵 Refactor the test file first
+
+The next test needs the same typing and clicking. Rather than copy
+those lines, pull them into a helper.
+
+📄 **File:** `frontend/src/components/ApplicationForm.test.tsx` —
+**edit**, three changes:
+
+**1.** Add this import **below line 2** (the `userEvent` import):
 
 ```tsx
 import type { UserEvent } from '@testing-library/user-event'
 ```
+
+**2.** Add this helper **above** the `describe` block:
 
 ```tsx
 async function fillAndSubmit(user: UserEvent) {
@@ -661,11 +725,20 @@ async function fillAndSubmit(user: UserEvent) {
 }
 ```
 
-Replace the typing and clicking lines in the first test with
-`await fillAndSubmit(user)`. The first test should still pass — that's
-your proof the refactor was safe.
+**3.** In the first test, replace the typing and clicking lines with
+one line:
 
-Now add the new test:
+```tsx
+    await fillAndSubmit(user)
+```
+
+The first test should still pass — that's your proof the refactor was
+safe.
+
+#### 🔴 Red
+
+📄 **File:** `frontend/src/components/ApplicationForm.test.tsx` —
+**edit**: add inside the `describe` block, after the first test:
 
 ```tsx
   it('clears the fields after submitting', async () => {
@@ -684,8 +757,9 @@ Acme`.
 
 #### 🟢 Green
 
-In `ApplicationForm.tsx`, add one line to `handleSubmit`, after
-`onSubmit(form)` (line 25):
+📄 **File:** `frontend/src/components/ApplicationForm.tsx` — **edit**:
+add one line to `handleSubmit`, directly **after line 25**
+(`onSubmit(form)`):
 
 ```tsx
     setForm(EMPTY_FORM)
@@ -700,19 +774,19 @@ Commit with message `feat(frontend): add ApplicationForm`.
 ## Step 4 — The API module
 
 **Connect the dots.** The components are done, but nothing talks to the
-backend yet. Each endpoint from lesson 05 needs a matching function:
+backend yet. Each endpoint from lesson 06 needs a matching function:
 
-| Function | Request |
-| --- | --- |
-| `fetchApplications()` | `GET /applications` |
-| `createApplication(data)` | `POST /applications` |
-| `updateStatus(id, status)` | `PATCH /applications/{id}` |
-| `deleteApplication(id)` | `DELETE /applications/{id}` |
+| Function | Request | Story |
+| --- | --- | --- |
+| `fetchApplications()` | `GET /applications` | US-2, US-5 |
+| `createApplication(data)` | `POST /applications` | US-1 |
+| `updateStatus(id, status)` | `PATCH /applications/{id}` | US-3 |
+| `deleteApplication(id)` | `DELETE /applications/{id}` | US-4 |
 
 `fetch` is built into browsers. It returns a **Promise** of a
 **Response**. `response.ok` is `true` for status codes 200–299.
 
-Create `frontend/src/api.ts`:
+📄 **File:** `frontend/src/api.ts` — **new**:
 
 ```ts
 import type { Application, NewApplication } from './types'
@@ -766,10 +840,12 @@ export async function deleteApplication(id: number): Promise<void> {
 }
 ```
 
+- **Line 3** — the backend's address (lesson 03, port 8000).
 - **`Promise<Application[]>`** — "this returns, eventually, a list of
   applications."
 - **`Content-Type: application/json`** tells FastAPI the body is JSON.
-- **`JSON.stringify`** turns an object into JSON text.
+- **`JSON.stringify`** turns an object into JSON text — the opposite of
+  `response.json()`.
 - **`{ status }`** is shorthand for `{ status: status }`.
 - The `if (!response.ok)` check is repeated four times. You'll remove
   that duplication in GRADUS II.
@@ -786,7 +862,8 @@ files are *not* automatically checked yet.
 
 ## Step 5 — Wire it up in `App`
 
-Replace `frontend/src/App.tsx`:
+📄 **File:** `frontend/src/App.tsx` — **edit**: replace the whole file
+with:
 
 ```tsx
 import { useEffect, useState } from 'react'
@@ -847,16 +924,21 @@ export default function App() {
 
 - **Lines 12–13:** the error message lives in a constant outside the
   component, so it's defined once and easy to find.
-- **Lines 19–23:** load applications once when the page opens. `.then`
-  runs when the data arrives; `.catch` runs if anything fails.
-- **`string | null`** — the error is either a message or nothing.
+- **Line 16** — the list of applications, starting empty.
+- **Line 17, `string | null`** — the error is either a message or
+  nothing.
+- **Lines 19–23 (US-2, US-5):** load applications once when the page
+  opens. `.then` runs when the data arrives; `.catch` runs if anything
+  fails.
 - **Line 45, `{error && <p>...}`:** if `error` is `null`, render nothing;
   otherwise render the message. **`role="alert"`** makes screen readers
   announce it.
 - **Each handler updates state with a *new* array:**
-  - create: `[...applications, created]` — copy, then add to the end
-  - delete: `.filter(...)` — keep every item *except* the deleted one
-  - status: `.map(...)` — swap in the updated item, keep the rest
+  - create (US-1): `[...applications, created]` — copy, then add to the
+    end
+  - delete (US-4): `.filter(...)` — keep every item *except* the deleted
+    one
+  - status (US-3): `.map(...)` — swap in the updated item, keep the rest
 
 > **Known gap:** if create, delete, or status change fails, nothing
 > tells the user. GRADUS II adds error handling for every action.
@@ -865,12 +947,14 @@ export default function App() {
 
 ## Step 6 — Run it… and meet CORS
 
-You need **two terminals** — one per server. In VS Code, click the
-**split terminal** icon in the terminal panel.
+You need **three things running**: the database, the backend, and the
+frontend. In VS Code, click the **split terminal** icon in the terminal
+panel to get two terminals.
 
 **Terminal 1** (from the repo root):
 
 ```bash
+docker compose up -d --wait
 cd backend
 uv run alembic upgrade head
 uv run fastapi dev app/main.py
@@ -912,22 +996,24 @@ first.
 
 ### 🔴 Red (backend)
 
-Stop the backend server (`Ctrl+C` in terminal 1). Create
-`backend/tests/test_cors.py`:
+Stop the backend server (`Ctrl+C` in terminal 1; you're still in
+`backend/`).
+
+📄 **File:** `backend/tests/test_cors.py` — **new**:
 
 ```python
 FRONTEND = "http://localhost:5173"
 
 
-def test_frontend_origin_is_allowed(client):
-    response = client.get("/health", headers={"Origin": FRONTEND})
+async def test_frontend_origin_is_allowed(client):
+    response = await client.get("/health", headers={"Origin": FRONTEND})
 
     allowed = response.headers.get("access-control-allow-origin")
     assert allowed == FRONTEND
 
 
-def test_other_origins_are_not_allowed(client):
-    response = client.get(
+async def test_other_origins_are_not_allowed(client):
+    response = await client.get(
         "/health",
         headers={"Origin": "http://unknown.example"},
     )
@@ -941,24 +1027,25 @@ def test_other_origins_are_not_allowed(client):
   someone ever allows *every* origin.
 
 ```bash
-cd backend
 uv run pytest
 ```
 
-🔴 **Expected:** the first test fails — `assert None ==
-'http://localhost:5173'`. The second passes.
+🔴 **Expected:** the first test fails —
+`assert None == 'http://localhost:5173'`. The second passes.
 
 ### 🟢 Green (backend)
 
-In `backend/app/main.py`, add an import below the FastAPI import
-(line 3):
+📄 **File:** `backend/app/main.py` — **edit**, two changes:
+
+**1.** Add a new import as **line 4**, directly below the FastAPI
+import on line 3:
 
 ```python
 from fastapi.middleware.cors import CORSMiddleware
 ```
 
-Then, directly below the line `app = FastAPI(title="Tiro Job Tracker")`,
-add:
+**2.** `app = FastAPI(title="Tiro Job Tracker")` is now on **line 11**.
+Directly **below** it, add:
 
 ```python
 app.add_middleware(
@@ -987,27 +1074,29 @@ Start the backend again (`uv run fastapi dev app/main.py`) and reload
 
 ---
 
-## Step 7 — Try it by hand
+## Step 7 — Try it by hand: walk the user stories
 
 Work through this checklist in the browser. After each step, **reload
-the page** to prove the change was saved in the database, not just on
+the page** to prove the change was saved in PostgreSQL, not just on
 screen.
 
 - [ ] The empty message shows when there are no applications.
-- [ ] Adding an application shows it in the list, and it survives a
-      reload.
+- [ ] **US-1:** adding an application shows it in the list.
 - [ ] The form clears after adding.
-- [ ] Changing a status survives a reload.
-- [ ] Deleting removes it, and it stays gone after a reload.
+- [ ] **US-3:** changing a status survives a reload.
+- [ ] **US-4:** deleting removes it, and it stays gone after a reload.
 - [ ] Submitting with an empty field is blocked by the browser.
+- [ ] **US-5:** stop the backend *and* run `docker compose down`, then
+      start everything again — your applications are all still there.
 
 > **Two requests on page load?** In development, React's `StrictMode`
-> (in `main.tsx`) runs effects twice on purpose, to help you spot bugs.
-> It doesn't happen in a production build.
+> (in `frontend/src/main.tsx`) runs effects twice on purpose, to help
+> you spot bugs. It doesn't happen in a production build.
 
 ### Optional: a little layout
 
-Add to `frontend/src/index.css`:
+📄 **File:** `frontend/src/index.css` — **edit**: add at the **end of
+the file**:
 
 ```css
 form {
@@ -1096,15 +1185,18 @@ handler. `onClick={() => onDelete(application.id)}` passes a function
 that runs only on click.
 </details>
 
-**5. Why does `getByRole('button', { name: 'Delete Globex' })` work when
-the button's visible text is only "Delete"?**
+**5. Trace US-4 end to end: what happens, in order, when you click
+Delete?**
 
 <details>
 <summary>Answer</summary>
 
-`aria-label` sets the button's accessible name to "Delete Globex."
-Testing Library looks up buttons by accessible name, the same name a
-screen reader announces.
+The button's `onClick` calls `onDelete(id)` → `App`'s `handleDelete`
+calls `deleteApplication(id)` in `api.ts` → `fetch` sends
+`DELETE /applications/{id}` → FastAPI's `delete_application` finds the
+row and awaits `db.delete` and `db.commit` → asyncpg sends the SQL to
+PostgreSQL → the response is `204` → `handleDelete` filters the item out
+of state → React re-draws the list without it.
 </details>
 
 ---
@@ -1117,10 +1209,8 @@ screen reader announces.
 
 Docs for going deeper:
 
-- React — managing state:
-  <https://react.dev/learn/managing-state>
-- React — `useEffect`:
-  <https://react.dev/reference/react/useEffect>
+- React — managing state: <https://react.dev/learn/managing-state>
+- React — `useEffect`: <https://react.dev/reference/react/useEffect>
 - Testing Library — queries:
   <https://testing-library.com/docs/queries/about>
 - user-event: <https://testing-library.com/docs/user-event/intro>
@@ -1128,4 +1218,4 @@ Docs for going deeper:
   <https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS>
 - FastAPI — CORS: <https://fastapi.tiangolo.com/tutorial/cors/>
 
-Next: [08 — Guardrails and debrief](08-guardrails-and-debrief.md)
+Next: [09 — Guardrails and debrief](09-guardrails-and-debrief.md)

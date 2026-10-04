@@ -1,7 +1,12 @@
 # 02 — Scaffold the repo
 
-**Goal:** the repo has the files every project needs before any app code
-exists — ignore rules, line-ending rules, editor settings, and a working
+> **Where this fits.** No user story yet. Before any app code exists, a
+> project needs its ground rules: what Git ignores, how lines end, how
+> the editor formats code, and a guard that runs checks before every
+> commit. Getting these right now prevents a whole class of confusing
+> problems later.
+
+**Goal:** ignore rules, line-ending rules, editor settings, and a working
 Husky pre-commit hook. You make your first commit and push it.
 
 ---
@@ -24,7 +29,8 @@ untracked files like `README.md`, `guide/`, and `.vscode/`.
 > **Terminology:** the folder the terminal is "in" is the
 > **working directory**. Every command in this guide says which folder
 > to be in. Unless told otherwise, you're at the **repo root** — the
-> top-level folder of your repo.
+> top-level folder of your repo. Run `pwd` ("print working directory")
+> any time you're unsure.
 
 ---
 
@@ -33,15 +39,15 @@ untracked files like `README.md`, `guide/`, and `.vscode/`.
 **Connect the dots.** Some files should never be committed:
 
 - things you can regenerate (`node_modules`, `.venv`, coverage reports)
-- things specific to your machine (the database file, caches)
+- things specific to your machine (caches, editor clutter)
 - secrets (`.env` files)
 
 Git needs a list of these. That list is a file named `.gitignore` at the
 repo root. *Before reading on: which of the folders in lesson 00's tree
 would you ignore?*
 
-Create a new file at the repo root named `.gitignore` (note the leading
-dot) with this content:
+📄 **File:** `.gitignore` — **new**, at the repo root (note the
+leading dot):
 
 ```gitignore
 # --- Python ---
@@ -57,9 +63,6 @@ coverage.xml
 htmlcov/
 frontend/coverage/
 
-# --- Database files (each dev makes their own) ---
-*.db
-
 # --- Node ---
 node_modules/
 dist/
@@ -72,20 +75,22 @@ dist/
 Thumbs.db
 ```
 
-**Why ignore `*.db`?** Each developer creates their own database by
-running migrations (lesson 04). Committing the file would overwrite
-everyone's data with yours.
+**Why isn't the database here?** Your data won't live in a file in this
+repo at all — it will live inside a Docker **volume** that Docker
+manages (lesson 04). Each developer gets their own, created from the
+same setup files.
 
 ---
 
 ## Step 3 — `.gitattributes`
 
 **Connect the dots.** Windows ends lines of text with two invisible
-characters (`CRLF`); macOS and Linux use one (`LF`). Git hooks are shell
-scripts, and a shell script with Windows line endings fails with
-confusing errors like `\r: command not found`.
+characters (`CRLF`); macOS and Linux use one (`LF`). Shell scripts —
+like Git hooks and the database setup script you'll write in lesson
+04 — fail with confusing errors like `\r: command not found` when they
+have Windows line endings.
 
-Create `.gitattributes` at the repo root:
+📄 **File:** `.gitattributes` — **new**, at the repo root:
 
 ```gitattributes
 # Store and check out all text files with LF line endings.
@@ -120,6 +125,11 @@ npm init -y
 
 ✅ Creates `package.json` at the root. `-y` means "accept all defaults".
 
+> **Tidy-up:** `npm init -y` sometimes copies the first lines of
+> `README.md` into the `"description"` field of `package.json`. If it
+> did, replace that text with something short, like
+> `"Job tracker — GRADUS I"`.
+
 ```bash
 npm install --save-dev husky
 ```
@@ -148,16 +158,19 @@ the hooks installed without doing anything extra.
 
 ### Replace the default hook
 
-Open `.husky/pre-commit`. Husky filled it with `npm test`, which would
-fail right now (there are no tests yet). Replace the whole file with:
+Husky filled the hook with `npm test`, which would fail right now (there
+are no tests yet).
+
+📄 **File:** `.husky/pre-commit` — **edit**: replace the whole file
+with:
 
 ```sh
 echo "Husky pre-commit hook ran."
 ```
 
-For now, the hook only proves it runs. You'll add the backend tests to
-it in lesson 03, the frontend tests in lesson 06, and linters in
-lesson 08.
+For now, the hook only proves it runs. It will grow as the project
+does: backend tests in lesson 03, the database in lesson 05, frontend
+tests in lesson 07, and linters in lesson 09.
 
 ---
 
@@ -165,11 +178,13 @@ lesson 08.
 
 **Connect the dots.** The Python extension needs to know where your
 tests live. Coverage Gutters needs to know which report files to read.
-Formatters need to know which language gets which tool. These settings
-belong to *this project*, so they go in `.vscode/settings.json` and get
-committed for everyone.
+Formatters need to know which language gets which tool — and Python
+needs to be indented the same way in every file. These settings belong
+to *this project*, so they go in the repo and get committed for
+everyone.
 
-Create `.vscode/settings.json`:
+📄 **File:** `.vscode/settings.json` — **new** (the `.vscode/` folder
+already exists; it holds `extensions.json`):
 
 ```json
 {
@@ -186,7 +201,10 @@ Create `.vscode/settings.json`:
 
   "editor.formatOnSave": true,
   "[python]": {
-    "editor.defaultFormatter": "charliermarsh.ruff"
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4,
+    "editor.detectIndentation": false
   },
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
@@ -203,7 +221,20 @@ Create `.vscode/settings.json`:
 | `coverage-gutters.coverageFileNames` | The report files to look for: `lcov.info` (frontend) and `coverage.xml` (backend) |
 | `showLineCoverage` / `showRulerCoverage` | Color the lines and the scrollbar |
 | `editor.formatOnSave` | Formats files every time you save |
-| `[python]`, `[typescript]`… | Which formatter to use per language |
+| `[python]` block | Ruff formats Python; indentation is always **4 spaces** |
+| `[typescript]`, `[typescriptreact]` | Prettier formats TypeScript |
+
+### Why pin Python to 4 spaces?
+
+In Python, **indentation is syntax** — it decides which lines belong to
+which block. Python's style guide, **PEP 8**, says to use 4 spaces, and
+Ruff enforces it (rules `E111` and `E114`).
+
+By default, VS Code *guesses* a file's indentation from its contents
+(`detectIndentation`). One file indented with 2 spaces can make it keep
+guessing 2, and you end up with a file that mixes 2 and 4. That's
+confusing to read and Ruff will flag every line. Turning detection off
+and pinning 4 makes every Python file consistent.
 
 > **Why not set the Python interpreter here?** Its path differs between
 > Windows and macOS, so it can't be shared. You'll select it in lesson
@@ -277,14 +308,15 @@ How do they end up with your pre-commit hook?**
 The commit is cancelled. Nothing is committed until the hook passes.
 </details>
 
-**3. Why is `*.db` in `.gitignore`?**
+**3. Why turn off VS Code's indentation detection for Python?**
 
 <details>
 <summary>Answer</summary>
 
-Each developer builds their own database by running migrations.
-Committing the file would share one person's local data with everyone
-and cause conflicts.
+Because indentation is part of Python's syntax, and detection can
+guess the wrong width from one oddly indented file, leading to files
+that mix 2 and 4 spaces. Pinning 4 spaces keeps every file consistent
+with PEP 8 and Ruff.
 </details>
 
 ---

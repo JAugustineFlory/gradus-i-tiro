@@ -1,8 +1,25 @@
 # 03 — Backend: first test
 
+> **Where this fits.** Every user story needs a backend that can answer
+> requests. Before it can store applications (US-1, US-5), it has to
+> exist and respond at all. This lesson builds the smallest possible
+> backend — one endpoint that says "I'm alive" — and proves it works
+> with your first test.
+
 **Goal:** a Python project managed by uv, a FastAPI app with one
 endpoint (`GET /health`), your first red → green TDD cycle, coverage in
 the editor, and the backend tests running in your pre-commit hook.
+
+---
+
+## Concepts first
+
+| Term | Plain English |
+| --- | --- |
+| **FastAPI** | A Python **web framework**: you write functions, and FastAPI calls them when matching HTTP requests arrive, then turns their return values into HTTP responses |
+| **Endpoint** (or **route**) | One URL + method the server answers, like `GET /health` |
+| **pytest** | Python's most popular test runner. It finds functions named `test_…` and runs them |
+| **Package** | A folder of Python files you can import from, marked by an `__init__.py` file |
 
 ---
 
@@ -11,12 +28,14 @@ the editor, and the backend tests running in your pre-commit hook.
 From the **repo root**:
 
 ```bash
-uv init backend --no-readme --vcs none --python 3.12
+uv init backend --app --no-package --no-readme --vcs none --python 3.12
 ```
 
 | Part | Meaning |
 | --- | --- |
 | `uv init backend` | Create a new Python project in a folder named `backend` |
+| `--app` | This is an *application* (something you run), not a library |
+| `--no-package` | Don't set it up to be built and published as an installable package |
 | `--no-readme` | Skip creating a README (the repo already has one) |
 | `--vcs none` | Don't create a new Git repo inside — we're already in one |
 | `--python 3.12` | Use Python 3.12 for this project |
@@ -29,7 +48,8 @@ uv init backend --no-readme --vcs none --python 3.12
 
 Delete `backend/main.py`. Your app will live in its own folder instead.
 
-Open `backend/pyproject.toml` and read it. It's short:
+Open `backend/pyproject.toml` and read it. It's short (yours may also
+have an `authors` line, filled in from your Git settings):
 
 ```toml
 [project]
@@ -41,6 +61,14 @@ dependencies = []
 ```
 
 `dependencies = []` is empty — you haven't installed anything yet.
+
+> ⚠️ **Does your `pyproject.toml` have a `[build-system]` section, or a
+> `[project.scripts]` section?** Then uv created a *packaged* project —
+> one meant to be built and published, which expects its code in
+> `src/backend/`. Our app doesn't work that way. **Delete both
+> sections**, delete any `src/` folder uv created, and continue. (The
+> `--no-package` flag prevents this; some uv versions default
+> differently.)
 
 ---
 
@@ -64,7 +92,8 @@ uv add "fastapi[standard]"
 `uv.lock`.
 
 - **`[standard]`** is an "extra": it also installs the `fastapi` command
-  line tool and **uvicorn**, the server that actually runs your app.
+  line tool, **uvicorn** (the server that actually runs your app), and
+  **httpx** (which you'll use for testing in lesson 06).
 - **`uv.lock`** records exact versions of everything installed. Commit
   it, so everyone gets identical packages.
 
@@ -93,8 +122,11 @@ list. These are installed for development but aren't part of the app.
 
 1. Command Palette: `Ctrl+Shift+P` / `Cmd+Shift+P`
 2. **Python: Select Interpreter**
-3. Choose the one whose path contains `backend/.venv`. If it's not
-   listed, choose **Enter interpreter path…** and browse to:
+3. Choose the interpreter whose path contains `backend/.venv`.
+   If no option contains that path, that's okay — the environment may
+   not show up in the list automatically. Choose **Enter interpreter
+   path…** and browse to the project's environment (**not** the global
+   Python installation):
    - Windows: `backend\.venv\Scripts\python.exe`
    - macOS / Linux: `backend/.venv/bin/python`
 
@@ -105,7 +137,8 @@ appear, because VS Code can now see the installed packages.
 
 ## Step 4 — Configure pytest and Ruff
 
-Add these sections to the **bottom** of `backend/pyproject.toml`:
+📄 **File:** `backend/pyproject.toml` — **edit**: add these sections at
+the **bottom** of the file:
 
 ```toml
 [tool.pytest.ini_options]
@@ -131,7 +164,8 @@ select = ["E", "F", "I"]
 | `--cov=app` | Measure coverage of the `app/` package |
 | `--cov-report=term-missing` | Print a coverage table listing untested line numbers |
 | `--cov-report=xml` | Also write `coverage.xml`, which Coverage Gutters reads |
-| Ruff `select` | `E` = style errors, `F` = likely bugs, `I` = import order |
+| Ruff `line-length` | Lines up to 88 characters (Ruff's default, matching the Black formatter) |
+| Ruff `select` | `E` = style errors (including indentation), `F` = likely bugs, `I` = import order |
 
 **`addopts`** means "add these options every time pytest runs," so plain
 `uv run pytest` always includes coverage.
@@ -140,14 +174,16 @@ select = ["E", "F", "I"]
 
 ## Step 5 — Create the folders
 
-Create these two folders inside `backend/`, and one empty file:
+Create these inside `backend/`:
 
 ```text
 backend/
 ├── app/
-│   └── __init__.py   ← empty file
-└── tests/
+│   └── __init__.py   ← new, empty file
+└── tests/            ← new, empty folder
 ```
+
+📄 **File:** `backend/app/__init__.py` — **new**, leave it **empty**.
 
 **What's `__init__.py`?** An empty file that tells Python "this folder is
 a **package**" — a group of modules you can import from. It's what makes
@@ -164,12 +200,12 @@ tools know the app is up.
 - The **request** will be: `GET /health`
 - The **response** should be: status `200`, body `{"status": "ok"}`
 - To test it without starting a real server, FastAPI provides
-  **`TestClient`**, which sends fake requests straight to your app.
+  **`TestClient`**, which sends requests straight to your app in memory.
 
 *Before reading on: using Arrange / Act / Assert, what would each part
 of this test be?*
 
-Create `backend/tests/test_health.py`:
+📄 **File:** `backend/tests/test_health.py` — **new**:
 
 ```python
 from fastapi.testclient import TestClient
@@ -198,7 +234,7 @@ Line by line:
 - **Lines 11–12** are the *assert*s. `assert` raises an error if the
   condition is false, which makes the test fail.
 
-Run it:
+Run it (from `backend/`):
 
 ```bash
 uv run pytest
@@ -208,13 +244,17 @@ uv run pytest
 `ModuleNotFoundError: No module named 'app.main'`. That's red — the test
 can't even find the code. Good.
 
-Now create `backend/app/main.py` with *only* this:
+📄 **File:** `backend/app/main.py` — **new**, with *only* this:
 
 ```python
 from fastapi import FastAPI
 
 app = FastAPI(title="Tiro Job Tracker")
 ```
+
+- **Line 1** imports the `FastAPI` class.
+- **Line 3** creates your application object. Every route you write
+  will be attached to it. `title` appears at the top of the API docs.
 
 Run again:
 
@@ -231,7 +271,17 @@ catch.
 
 ## Step 7 — 🟢 Green: make it pass
 
-Add the route to `backend/app/main.py`, below line 3:
+📄 **File:** `backend/app/main.py` — **edit**: add these lines **below
+line 3** (leave two blank lines after line 3, as Python style expects
+before a function):
+
+```python
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+```
+
+The whole file is now:
 
 ```python
 from fastapi import FastAPI
@@ -244,9 +294,12 @@ def health():
     return {"status": "ok"}
 ```
 
-- **`@app.get("/health")`** is a **decorator**: it registers the function
-  below it to handle `GET` requests to `/health`.
-- FastAPI turns the returned dictionary into JSON automatically.
+- **Line 6, `@app.get("/health")`**, is a **decorator**: it registers the
+  function below it to handle `GET` requests to `/health`.
+- **Line 7** defines the function. Its name doesn't matter to the URL;
+  the decorator decides that.
+- **Line 8**: FastAPI turns the returned dictionary into JSON
+  automatically.
 
 Run:
 
@@ -254,7 +307,7 @@ Run:
 uv run pytest
 ```
 
-🟢 **Expected** (numbers may differ slightly):
+🟢 **Expected** (exact formatting may differ slightly):
 
 ```text
 tests/test_health.py .                                   [100%]
@@ -274,13 +327,13 @@ Coverage XML written to file coverage.xml
 The `.` after the filename means one passing test. `Missing` is empty
 because every line ran.
 
-**Refactor?** Nothing to clean up yet. Move on.
+**🔵 Refactor?** Nothing to clean up yet. Move on.
 
 ---
 
 ## Step 8 — See it for real
 
-Start the development server:
+Start the development server (still in `backend/`):
 
 ```bash
 uv run fastapi dev app/main.py
@@ -322,6 +375,8 @@ test run updates the colors.
 
 ## Step 10 — Lint and format
 
+Still in `backend/`:
+
 ```bash
 uv run ruff check .
 uv run ruff format .
@@ -334,7 +389,8 @@ many files it reformatted (possibly `0`).
 
 ## Step 11 — Add backend tests to the pre-commit hook
 
-Replace the contents of `.husky/pre-commit` (at the **repo root**) with:
+📄 **File:** `.husky/pre-commit` (at the **repo root**) — **edit**:
+replace the whole file with:
 
 ```sh
 echo "Running backend tests..."
@@ -364,9 +420,9 @@ git push
 ✅ You see `Running backend tests...`, then the test output, then the
 commit summary.
 
-**Try breaking it on purpose:** change `"ok"` to `"okay"` in
-`app/main.py`, run `git add .` and `git commit -m "test hook"`. The hook
-should fail and the commit should be cancelled. Change it back.
+**Try breaking it on purpose:** in `backend/app/main.py`, change `"ok"`
+to `"okay"` on line 8. Run `git add .` and `git commit -m "test hook"`.
+The hook should fail and the commit should be cancelled. Change it back.
 
 ---
 
@@ -431,4 +487,4 @@ Docs for going deeper:
 - uv projects: <https://docs.astral.sh/uv/guides/projects/>
 - pytest: <https://docs.pytest.org/en/stable/getting-started.html>
 
-Next: [04 — Database and migrations](04-database-and-migrations.md)
+Next: [04 — Docker and PostgreSQL](04-docker-and-postgres.md)

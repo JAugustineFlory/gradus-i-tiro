@@ -1,5 +1,8 @@
 # 01 — Install your tools
 
+> **Where this fits.** No user story yet — this is the toolbox. Every
+> later lesson assumes these tools are installed and working.
+
 **Goal:** every tool installed, verified, and ready. At the end, one
 command per tool prints a version number.
 
@@ -67,8 +70,8 @@ The terminal tab should now say `bash`.
 ## 3. Node.js and npm
 
 **What it is:** Node.js runs JavaScript outside a browser. The frontend
-tools (Vite, Vitest) run on it. **npm** comes with Node and installs
-JavaScript packages.
+tools (Vite, Vitest) and Husky run on it. **npm** comes with Node and
+installs JavaScript packages.
 
 Install the **LTS** ("long-term support") version from
 <https://nodejs.org/>.
@@ -134,7 +137,44 @@ Docs: <https://docs.astral.sh/uv/getting-started/installation/>
 
 ---
 
-## 5. VS Code extensions
+## 5. Docker Desktop
+
+**What it is:** Docker runs software inside **containers** — sealed
+boxes that hold a program and everything it needs, and behave the same
+on every computer. You'll use it to run **PostgreSQL**, the database,
+so nobody has to install a database directly on their machine. (Lesson
+04 explains containers properly.)
+
+Install **Docker Desktop** from
+<https://docs.docker.com/get-started/get-docker/>.
+
+- **Windows:** Docker Desktop needs **WSL 2** (the Windows Subsystem for
+  Linux). The installer offers to set it up — accept. You may need to
+  restart your computer.
+- **macOS:** pick the download for your chip (Apple silicon or Intel).
+- **Linux:** follow the page for your distribution.
+
+**Start Docker Desktop** after installing. It runs in the background;
+its whale icon appears in your system tray (Windows) or menu bar
+(macOS). Docker commands only work while it's running.
+
+**Check:**
+
+```bash
+docker --version
+docker compose version
+docker run hello-world
+```
+
+✅ The last command downloads a tiny test image and prints
+**Hello from Docker!**
+
+> **`Cannot connect to the Docker daemon`?** Docker Desktop isn't
+> running. Start it, wait until it says it's running, and try again.
+
+---
+
+## 6. VS Code extensions
 
 Open this repo's folder in VS Code (**File → Open Folder…**). VS Code
 reads [`.vscode/extensions.json`](../.vscode/extensions.json) and shows
@@ -151,13 +191,13 @@ What each one does for you:
 | --- | --- |
 | **Python** | A test beaker icon in the sidebar; "Run" buttons above tests |
 | **Pylance** | Autocomplete and red squiggles for Python type errors |
-| **Ruff** | Warnings for unused imports, formats Python on save |
+| **Ruff** | Warnings for unused imports; formats Python on save |
 | **Even Better TOML** | Color highlighting in `pyproject.toml` |
+| **Docker** | Highlighting in `compose.yaml`; a Docker sidebar listing running containers |
 | **ESLint** | Squiggles for TypeScript/React mistakes |
 | **Prettier** | Formats TypeScript on save |
 | **Vitest** | Frontend tests appear in the Testing sidebar |
 | **Coverage Gutters** | Green/red bars beside each line showing test coverage |
-| **SQLite Viewer** | Click a `.db` file to see its tables |
 | **Pretty TypeScript Errors** | Turns long TypeScript errors into readable ones |
 
 ---
@@ -183,11 +223,21 @@ Close and reopen the terminal (or VS Code). The terminal only picks up
 newly installed programs when it starts.
 </details>
 
+**3. `docker run hello-world` says it can't connect to the Docker
+daemon. What's wrong?**
+
+<details>
+<summary>Answer</summary>
+
+Docker Desktop isn't running. The `docker` command is only a client; it
+needs the Docker Desktop background service to do the actual work.
+</details>
+
 ---
 
 ## Checkpoint
 
-All five commands print a version:
+All of these print a version (and the last prints a greeting):
 
 ```bash
 git --version
@@ -195,9 +245,11 @@ node --version
 npm --version
 uv --version
 uv python list --only-installed
+docker compose version
+docker run hello-world
 ```
 
-✅ The last one lists a `cpython-3.12` entry.
+✅ `uv python list` shows a `cpython-3.12` entry.
 
 Commit nothing yet — there's nothing to commit. Move on.
 

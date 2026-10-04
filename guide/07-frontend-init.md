@@ -1,4 +1,11 @@
-# 06 — Frontend: first test
+# 07 — Frontend: first test
+
+> **Where this fits.** The backend can now do everything in US-1
+> through US-4 — but only through `/docs`. A job seeker needs a real
+> screen: a form to record applications and a list to see them. That's
+> the **frontend**, the left-hand box in the lesson 00 diagram. This
+> lesson sets up its toolchain and proves it with one small test; lesson
+> 08 builds the screens.
 
 **Goal:** a React + TypeScript app scaffolded with Vite, Vitest and React
 Testing Library installed and configured, your first frontend red →
@@ -7,7 +14,7 @@ pre-commit hook.
 
 ---
 
-## The concepts first
+## Concepts first
 
 | Term | Plain English |
 | --- | --- |
@@ -15,9 +22,20 @@ pre-commit hook.
 | **JSX / TSX** | HTML-like syntax inside JavaScript/TypeScript. `.tsx` files are TypeScript files that contain JSX |
 | **TypeScript** | JavaScript plus **types**. It checks, before your code runs, that you're not passing a number where a string belongs |
 | **Vite** | Runs a dev server that reloads your page instantly on save, and builds the final app |
-| **Vitest** | A test runner built on Vite — it understands TypeScript and JSX with no extra setup |
+| **Vitest** | A test runner built on Vite — it understands TypeScript and JSX with no extra setup. The frontend's pytest |
 | **jsdom** | A fake browser that runs in Node, so tests can render components without opening a real browser |
 | **React Testing Library (RTL)** | Renders components in jsdom and lets you find things the way a *user* would — by visible text, labels, and roles |
+
+The backend and frontend toolchains line up neatly — useful to keep in
+mind:
+
+| Job | Backend | Frontend |
+| --- | --- | --- |
+| Manage packages | uv (`pyproject.toml`, `uv.lock`) | npm (`package.json`, `package-lock.json`) |
+| Run tests | pytest | Vitest |
+| Measure coverage | pytest-cov → `coverage.xml` | `@vitest/coverage-v8` → `lcov.info` |
+| Lint / format | Ruff | ESLint / Prettier |
+| Dev server | `fastapi dev` (port 8000) | `npm run dev` (port 5173) |
 
 ---
 
@@ -53,20 +71,23 @@ React page with a counter button. Stop the server with `Ctrl+C`.
 
 | File | Job |
 | --- | --- |
-| `index.html` | The one HTML page. React fills in the `<div id="root">` |
-| `src/main.tsx` | Entry point: finds `#root` and renders `<App />` into it |
-| `src/App.tsx` | The top-level component |
-| `package.json` | Dependencies and **scripts** (`dev`, `build`, `lint`…) |
-| `vite.config.ts` | Vite's settings — you'll add test settings here |
-| `tsconfig*.json` | TypeScript's settings |
-| `eslint.config.js` | Linting rules |
+| `frontend/index.html` | The one HTML page. React fills in the `<div id="root">` |
+| `frontend/src/main.tsx` | Entry point: finds `#root` and renders `<App />` into it |
+| `frontend/src/App.tsx` | The top-level component |
+| `frontend/package.json` | Dependencies and **scripts** (`dev`, `build`, `lint`…) |
+| `frontend/vite.config.ts` | Vite's settings — you'll add test settings here |
+| `frontend/tsconfig*.json` | TypeScript's settings |
+| `frontend/eslint.config.js` | Linting rules |
 
 ---
 
 ## Step 2 — Clean out the demo
 
-1. Delete `src/App.css` and the `src/assets/` folder.
-2. Replace `src/App.tsx` with:
+**1.** Delete `frontend/src/App.css` and the `frontend/src/assets/`
+folder.
+
+**2.** 📄 **File:** `frontend/src/App.tsx` — **edit**: replace the
+whole file with:
 
 ```tsx
 export default function App() {
@@ -78,7 +99,12 @@ export default function App() {
 }
 ```
 
-3. Replace `src/index.css` with a small readable baseline:
+- A component is just a function that returns JSX.
+- **`export default`** makes `App` the file's main export, which is how
+  `main.tsx` imports it.
+
+**3.** 📄 **File:** `frontend/src/index.css` — **edit**: replace the
+whole file with a small readable baseline:
 
 ```css
 :root {
@@ -99,8 +125,8 @@ main {
 }
 ```
 
-4. Match Prettier to Vite's code style (single quotes, no semicolons).
-   Create `frontend/.prettierrc`:
+**4.** 📄 **File:** `frontend/.prettierrc` — **new**. It matches Prettier
+to Vite's code style (single quotes, no semicolons):
 
 ```json
 {
@@ -109,14 +135,16 @@ main {
 }
 ```
 
-   Without this, format-on-save would rewrite every file with double
-   quotes and semicolons, and your code would stop matching this guide.
+Without this, format-on-save would rewrite every file with double
+quotes and semicolons, and your code would stop matching this guide.
 
 Run `npm run dev` again: the page just says **Job tracker**. Stop it.
 
 ---
 
 ## Step 3 — Install the test tools
+
+Still in `frontend/`:
 
 ```bash
 npm install -D vitest @vitest/coverage-v8 jsdom
@@ -146,8 +174,8 @@ npm install -D @testing-library/user-event @testing-library/jest-dom
 
 ## Step 4 — Configure Vitest
 
-Open `frontend/vite.config.ts`. It looks roughly like this (leave the
-`plugins` line exactly as Vite generated it):
+📄 **File:** `frontend/vite.config.ts` — **edit**. It looks roughly
+like this now (leave the `plugins` line exactly as Vite generated it):
 
 ```ts
 import { defineConfig } from 'vite'
@@ -161,7 +189,9 @@ export default defineConfig({
 Make two changes:
 
 1. Add a **reference line** as the very first line of the file.
-2. Add a **`test` block** after `plugins`.
+2. Add a **`test` block** after the `plugins` line.
+
+The file becomes:
 
 ```ts
 /// <reference types="vitest/config" />
@@ -189,16 +219,16 @@ export default defineConfig({
 
 - **Line 1** tells TypeScript that `defineConfig` accepts a `test`
   section. Without it, you'd get a red squiggle under `test`.
-- **`environment: 'jsdom'`** — run tests in the fake browser.
-- **`setupFiles`** — a file that runs before every test file.
-- **`reporter: ['text', 'lcov']`** — print a table *and* write
+- **Line 8, `environment: 'jsdom'`** — run tests in the fake browser.
+- **Line 9, `setupFiles`** — a file that runs before every test file.
+- **Line 12, `reporter: ['text', 'lcov']`** — print a table *and* write
   `coverage/lcov.info`, which Coverage Gutters reads.
-- **`include` / `exclude`** — measure your source files, but not the
-  entry point, the setup file, or the tests themselves.
+- **Lines 13–18, `include` / `exclude`** — measure your source files, but
+  not the entry point, the setup file, or the tests themselves.
 
 ### The setup file
 
-Create `frontend/src/setupTests.ts`:
+📄 **File:** `frontend/src/setupTests.ts` — **new**:
 
 ```ts
 import '@testing-library/jest-dom/vitest'
@@ -219,8 +249,8 @@ afterEach(() => {
 
 ### Scripts
 
-Open `frontend/package.json`. In `"scripts"`, add three lines (keep the
-existing ones):
+📄 **File:** `frontend/package.json` — **edit**: inside `"scripts"`,
+add three lines (keep the existing ones):
 
 ```json
 "test": "vitest",
@@ -244,14 +274,16 @@ existing ones):
 **Connect the dots.**
 
 - The backend stores statuses in lowercase: `applied`, `interviewing`.
-- The UI should *display* them capitalized: `Applied`, `Interviewing`.
+- The UI should *display* them capitalized: `Applied`, `Interviewing` —
+  that's part of US-2 (seeing your applications clearly).
 - That's a **pure function** — same input, same output, nothing else
   touched. Pure functions are the easiest things to test, so they're a
   good first step.
 
 *Before reading on: which two or three inputs would you test?*
 
-Create `frontend/src/utils/formatStatus.test.ts`:
+📄 **File:** `frontend/src/utils/formatStatus.test.ts` — **new** (create
+the `utils/` folder too):
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -268,10 +300,11 @@ describe('formatStatus', () => {
 })
 ```
 
-- **`describe`** groups related tests under a name.
-- **`it`** is one test. Read it as a sentence: "*it* capitalizes the
-  first letter."
-- **`expect(actual).toBe(expected)`** is the assertion.
+- **`describe`** (line 4) groups related tests under a name.
+- **`it`** (lines 5 and 9) is one test. Read it as a sentence: "*it*
+  capitalizes the first letter."
+- **`expect(actual).toBe(expected)`** is the assertion — the frontend's
+  `assert`.
 - **Line 2** imports a file that doesn't exist yet.
 
 ```bash
@@ -281,8 +314,9 @@ npm test
 🔴 **Expected:** `Failed to resolve import "./formatStatus"`. Leave watch
 mode running.
 
-Create `frontend/src/utils/formatStatus.ts` with a deliberately *wrong*
-version, so you see the test fail for the right reason:
+📄 **File:** `frontend/src/utils/formatStatus.ts` — **new**, with a
+deliberately *wrong* version, so you see the test fail for the right
+reason:
 
 ```ts
 export function formatStatus(status: string): string {
@@ -292,7 +326,7 @@ export function formatStatus(status: string): string {
 
 - **`export`** makes the function importable from other files.
 - **`(status: string): string`** — takes a string, returns a string.
-  That's TypeScript's type annotation.
+  That's TypeScript's type annotation, like Python's type hints.
 
 Save. Watch mode re-runs automatically.
 
@@ -304,7 +338,8 @@ is still empty).
 
 ## Step 6 — 🟢 Green
 
-Replace the function body:
+📄 **File:** `frontend/src/utils/formatStatus.ts` — **edit**: replace
+line 2 so the file reads:
 
 ```ts
 export function formatStatus(status: string): string {
@@ -330,10 +365,10 @@ npm run coverage
 ```
 
 ✅ A coverage table prints, and `frontend/coverage/lcov.info` is
-created. Open `src/utils/formatStatus.ts` with Coverage Gutters watching
-(or run **Coverage Gutters: Display Coverage**): green lines.
+created. Open `frontend/src/utils/formatStatus.ts` with Coverage Gutters
+watching (or run **Coverage Gutters: Display Coverage**): green lines.
 
-> **`App.tsx` shows 0%?** Expected — no test renders it yet. Lesson 07
+> **`App.tsx` shows 0%?** Expected — no test renders it yet. Lesson 08
 > explains why `App.tsx` stays untested in Tiro, and GRADUS II teaches
 > the technique that covers it.
 
@@ -346,9 +381,13 @@ there with its ▶ button.
 
 ## Step 8 — Add frontend tests to the pre-commit hook
 
-Replace `.husky/pre-commit` (at the **repo root**) with:
+📄 **File:** `.husky/pre-commit` (repo root) — **edit**: add the last
+two lines, so the whole file reads:
 
 ```sh
+echo "Starting the database..."
+docker compose up -d --wait
+
 echo "Running backend tests..."
 (cd backend && uv run pytest -q)
 
@@ -413,16 +452,17 @@ opening a real browser, so tests run fast inside Node.
 
 To remove what the previous test rendered, so each test starts with an
 empty page and can't accidentally find elements left over from another
-test.
+test. (The backend equivalent: the `engine` fixture dropping tables.)
 </details>
 
 ---
 
 ## Checkpoint
 
-- ✅ `npm run test:run` → `2 passed`
+- ✅ `npm run test:run` (in `frontend/`) → `2 passed`
 - ✅ `npm run dev` shows **Job tracker**
-- ✅ Committing runs backend *and* frontend tests
+- ✅ Committing starts the database and runs backend *and* frontend
+  tests
 
 Docs for going deeper:
 
@@ -432,4 +472,4 @@ Docs for going deeper:
 - TypeScript for JavaScript programmers:
   <https://www.typescriptlang.org/docs/handbook/typescript-in-5-minutes.html>
 
-Next: [07 — Components with TDD](07-components.md)
+Next: [08 — Components with TDD](08-components.md)
